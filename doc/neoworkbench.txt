@@ -12,12 +12,13 @@ CONTENTS                                               *neoworkbench-contents*
   3. Installation ....................... |neoworkbench-installation|
   4. Layout ............................. |neoworkbench-layout|
   5. Panes .............................. |neoworkbench-panes|
-  6. Commands ........................... |neoworkbench-commands|
-  7. Keymaps ............................ |neoworkbench-keymaps|
-  8. Configuration ...................... |neoworkbench-configuration|
-  9. API ............................... |neoworkbench-api|
- 10. Sessions ........................... |neoworkbench-sessions|
- 11. Highlight groups ................... |neoworkbench-highlights|
+  6. Third party plugins ................ |neoworkbench-third-party|
+  7. Commands ........................... |neoworkbench-commands|
+  8. Keymaps ............................ |neoworkbench-keymaps|
+  9. Configuration ...................... |neoworkbench-configuration|
+ 10. API ............................... |neoworkbench-api|
+ 11. Sessions ........................... |neoworkbench-sessions|
+ 12. Highlight groups ................... |neoworkbench-highlights|
 
 ==============================================================================
 1. INTRODUCTION                                    *neoworkbench-introduction*
@@ -152,13 +153,45 @@ plugin: >
     require("neoworkbench.providers").register({
       name = "explorer",
       title = "Files",
-      buffer = function(ctx)
-        return require("neo-tree.sources.manager").get_buf()
-      end,
+      variants = {
+        myplugin = {
+          module = "myplugin",
+          open = function(ctx, winid)
+            vim.api.nvim_set_current_win(winid)
+            require("myplugin").open()
+          end,
+          close = function(ctx, winid)
+            require("myplugin").close()
+          end,
+        },
+      },
     })
 <
 ==============================================================================
-6. COMMANDS                                              *neoworkbench-commands*
+6. THIRD PARTY PLUGINS                            *neoworkbench-third-party*
+
+A variant is an alternative implementation of a pane. The explorer ships with
+two of them, both render into the window that is current when they are opened
+which is what makes it possible to host them in a pane.
+
+    oil        oil.nvim      require("oil").open() in the pane
+    neo-tree   neo-tree.nvim neo-tree.command.execute, position = "current"
+
+The `providers` option decides which one is used, `auto` picks the first that
+is installed and falls back to the built in file tree, `builtin` forces the
+built in one and the name of a variant picks that one: >
+
+    require("neoworkbench").setup({
+      providers = {
+        explorer = "oil",
+      },
+    })
+<
+A plugin that owns its own window, like trouble.nvim or toggleterm.nvim, can
+not be hosted in a pane, those keep using the built in implementation.
+
+==============================================================================
+7. COMMANDS                                              *neoworkbench-commands*
 
                                                        *:Workbench*
 :Workbench             Open the workbench.
@@ -192,7 +225,7 @@ plugin: >
 :WorkbenchSave         Save the session of the current project.
 
 ==============================================================================
-7. KEYMAPS                                                *neoworkbench-keymaps*
+8. KEYMAPS                                                *neoworkbench-keymaps*
 
 The default keymaps use `<leader>W` so they do not clash with the usual
 `<leader>w` for windows.
@@ -211,7 +244,7 @@ The default keymaps use `<leader>W` so they do not clash with the usual
     <leader>Wq       Close the workbench
 
 ==============================================================================
-8. CONFIGURATION                                    *neoworkbench-configuration*
+9. CONFIGURATION                                    *neoworkbench-configuration*
 
 Every option is optional. >
 
@@ -251,8 +284,13 @@ Every option is optional. >
 <
 Set a keymap to `false` to remove it.
 
+The `providers` option decides which implementation serves a pane, `auto`
+prefers an installed plugin and falls back to the built in one, `builtin`
+forces the built in one and the name of a variant picks that one. See
+|neoworkbench-third-party|.
+
 ==============================================================================
-9. API                                                        *neoworkbench-api*
+10. API                                                        *neoworkbench-api*
 
                                                        *neoworkbench.setup()*
 setup({opts})
@@ -303,7 +341,7 @@ relayout()
         Recompute the layout and resize the panes.
 
 ==============================================================================
-10. SESSIONS                                           *neoworkbench-sessions*
+11. SESSIONS                                           *neoworkbench-sessions*
 
 The workbench remembers the layout and the panel of every project. The state
 is written to `stdpath("data")/neoworkbench/sessions` and restored the next
@@ -312,7 +350,7 @@ time a project is opened.
 Set `session.enabled` to `false` to turn the feature off.
 
 ==============================================================================
-11. HIGHLIGHT GROUPS                               *neoworkbench-highlights*
+12. HIGHLIGHT GROUPS                               *neoworkbench-highlights*
 
 The groups are registered with |neocore| and follow the colorscheme.
 

@@ -123,6 +123,10 @@ function M.open(layout_name)
   local captured_buf = vim.api.nvim_get_current_buf()
   local root_win = vim.api.nvim_get_current_win()
 
+  -- A plugin may have been installed since the last time the workbench was
+  -- opened, so the lookups are done again.
+  providers.invalidate()
+
   -- The layout is built inside the current window, so it uses the size of
   -- that window and not the size of the whole grid.
   local cols = vim.api.nvim_win_get_width(root_win)
@@ -155,14 +159,21 @@ function M.open(layout_name)
 
   for pane_name, winid in pairs(assignments) do
     if neowin.is_valid(winid) then
-      local bufnr = pane_buffer(pane_name, ctx)
-      if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
-        pcall(vim.api.nvim_win_set_buf, winid, bufnr)
-      end
+      local provider_name = pane_name == "panel" and M.panel or pane_name
+      local provider, variant = providers.resolve(provider_name, options.providers[provider_name])
 
-      local provider = providers.get(pane_name == "panel" and M.panel or pane_name)
-      if provider and provider.attach then
-        pcall(provider.attach, ctx, winid)
+      local bufnr
+      if variant then
+        -- A third party plugin takes over the window of the pane.
+        pcall(variant.open, ctx, winid)
+      else
+        bufnr = pane_buffer(pane_name, ctx)
+        if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+          pcall(vim.api.nvim_win_set_buf, winid, bufnr)
+        end
+        if provider and provider.attach then
+          pcall(provider.attach, ctx, winid)
+        end
       end
 
       if options.title then
@@ -176,7 +187,7 @@ function M.open(layout_name)
         end
       end
 
-      pane.set(pane_name, winid, bufnr)
+      pane.set(pane_name, winid, bufnr, variant)
     end
   end
 
@@ -206,6 +217,20 @@ function M.close()
       panes = pane.names(),
       buffers = pane.state.buffers or {},
     })
+  end
+
+  -- Give the windows back to the plugins that took them over.
+  local ctx = {
+    cfg = options,
+    captured_buf = pane.state.captured_buf,
+    panel = M.panel,
+    core = core,
+  }
+  for _, name in ipairs(pane.names()) do
+    local variant = pane.variant(name)
+    if variant and variant.close then
+      pcall(variant.close, ctx, pane.win(name))
+    end
   end
 
   apply.close(editor_buf)
@@ -304,11 +329,25 @@ function M.set_panel(name)
     core = core,
   }
 
-  local bufnr = provider_buffer(name, ctx)
-  if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
-    pcall(vim.api.nvim_win_set_buf, winid, bufnr)
-    pane.set("panel", winid, bufnr)
+  -- The panel that is replaced hands its window back first.
+  local current = pane.variant("panel")
+  if current and current.close then
+    pcall(current.close, ctx, winid)
   end
+
+  local options = config.get()
+  local provider, variant = providers.resolve(name, options.providers[name])
+
+  local bufnr
+  if variant then
+    pcall(variant.open, ctx, winid)
+  else
+    bufnr = provider_buffer(name, ctx)
+    if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+      pcall(vim.api.nvim_win_set_buf, winid, bufnr)
+    end
+  end
+  pane.set("panel", winid, bufnr, variant)
 
   if config.get().title then
     local title, icon = pane_title("panel")
@@ -353,11 +392,14 @@ function M.refresh()
   }
 
   for _, name in ipairs(pane.names()) do
-    local provider = providers.get(name == "panel" and M.panel or name)
-    if provider and provider.render then
-      local bufnr = pane.buf(name)
-      if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
-        pcall(provider.render, ctx, bufnr)
+    -- A pane that is served by a third party plugin refreshes itself.
+    if not pane.variant(name) then
+      local provider = providers.get(name == "panel" and M.panel or name)
+      if provider and provider.render then
+        local bufnr = pane.buf(name)
+        if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+          pcall(provider.render, ctx, bufnr)
+        end
       end
     end
   end

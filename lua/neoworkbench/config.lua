@@ -65,8 +65,9 @@ M.defaults = {
   -- The provider used for the bottom pane when the workbench opens.
   panel = "problems",
 
-  -- Which implementation to use for each pane, `auto` prefers an installed
-  -- plugin and falls back to the built in one.
+  -- Which implementation to use for each pane. `auto` prefers an installed
+  -- plugin and falls back to the built in one, `builtin` forces the built in
+  -- one and the name of a variant picks that one.
   providers = {
     explorer = "auto",
     terminal = "auto",

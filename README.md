@@ -128,11 +128,46 @@ A provider is a plain table, so a pane can be pointed at a third party plugin:
 require("neoworkbench.providers").register({
   name = "explorer",
   title = "Files",
-  buffer = function(ctx)
-    return require("neo-tree.sources.manager").get_buf()
-  end,
+  variants = {
+    myplugin = {
+      module = "myplugin",
+      open = function(ctx, winid)
+        vim.api.nvim_set_current_win(winid)
+        require("myplugin").open()
+      end,
+      close = function(ctx, winid)
+        require("myplugin").close()
+      end,
+    },
+  },
 })
 ```
+
+### Third party plugins
+
+A variant is an alternative implementation of a pane. The explorer ships with
+two, both of them render into the window that is current when they are opened
+which is what makes it possible to host them in a pane:
+
+| Variant    | Plugin          | How it is opened                                       |
+| ---------- | --------------- | ------------------------------------------------------ |
+| `oil`      | oil.nvim        | `require("oil").open()` in the pane                    |
+| `neo-tree` | neo-tree.nvim   | `neo-tree.command.execute` with `position = "current"` |
+
+`auto` picks the first one that is installed and falls back to the built in
+file tree, `builtin` forces the built in one and the name of a variant picks
+that one:
+
+```lua
+require("neoworkbench").setup({
+  providers = {
+    explorer = "oil",   -- or "neo-tree", "builtin" or "auto"
+  },
+})
+```
+
+A plugin that owns its own window, like trouble.nvim or toggleterm.nvim,
+cannot be hosted in a pane, those keep using the built in implementation.
 
 ## Commands
 

@@ -16,6 +16,8 @@ local M = {}
 
 M.registry = {}
 
+local available_cache = {}
+
 --- Register a provider.
 ---@param provider table
 function M.register(provider)
@@ -30,6 +32,97 @@ end
 ---@return table?
 function M.get(name)
   return M.registry[name]
+end
+
+--- True when a module can be found on the runtime path.
+--- The module is not loaded, so a plugin stays lazy until it is really used.
+---@param module string
+---@return boolean
+function M.available(module)
+  if type(module) ~= "string" or module == "" then
+    return false
+  end
+  if available_cache[module] ~= nil then
+    return available_cache[module]
+  end
+
+  local base = module:gsub("%.", "/")
+  local found = false
+  for _, rtp in ipairs(vim.api.nvim_list_runtime_paths()) do
+    local root = rtp .. "/lua"
+    if
+      vim.fn.filereadable(root .. "/" .. base .. ".lua") == 1
+      or vim.fn.filereadable(root .. "/" .. base .. "/init.lua") == 1
+    then
+      found = true
+      break
+    end
+  end
+
+  available_cache[module] = found
+  return found
+end
+
+--- Forget the cached lookups, the runtime path changed.
+function M.invalidate()
+  available_cache = {}
+end
+
+--- Resolve a pane to the provider and the variant that should serve it.
+---
+--- A variant is an alternative implementation of a provider, usually a third
+--- party plugin. The choice is the name of the variant, `auto` picks the
+--- first one that is installed and `builtin` forces the built in one.
+---@param name string
+---@param choice string?
+---@return table? provider, table? variant
+function M.resolve(name, choice)
+  local provider = M.get(name)
+  if not provider then
+    return nil, nil
+  end
+
+  local variants = provider.variants or {}
+
+  if type(choice) == "string" and choice ~= "" and choice ~= "auto" and choice ~= "builtin" then
+    local variant = variants[choice]
+    if variant and M.available(variant.module) then
+      return provider, variant
+    end
+    return provider, nil
+  end
+
+  if choice == "auto" or choice == nil or choice == "" then
+    for _, variant_name in ipairs(M.variant_names(provider.name)) do
+      local variant = variants[variant_name]
+      if variant and M.available(variant.module) then
+        return provider, variant
+      end
+    end
+  end
+
+  return provider, nil
+end
+
+--- The names of the variants of a provider.
+--- The variants are ordered by their priority, the highest one comes first.
+---@param name string
+---@return string[]
+function M.variant_names(name)
+  local provider = M.get(name)
+  local names = {}
+  for variant_name in pairs((provider and provider.variants) or {}) do
+    names[#names + 1] = variant_name
+  end
+  table.sort(names, function(a, b)
+    local pa = (provider.variants[a] and provider.variants[a].priority) or 0
+    local pb = (provider.variants[b] and provider.variants[b].priority) or 0
+    if pa ~= pb then
+      return pa > pb
+    end
+    return a < b
+  end)
+  return names
 end
 
 --- The names of every registered provider.
@@ -72,14 +165,23 @@ function M.set_lines(bufnr, lines)
 end
 
 --- Load the built in providers.
+--- A provider that was registered before keeps its place, so a user can
+--- replace one of the built in ones.
 function M.load_defaults()
-  M.register(require("neoworkbench.providers.editor"))
-  M.register(require("neoworkbench.providers.explorer"))
-  M.register(require("neoworkbench.providers.problems"))
-  M.register(require("neoworkbench.providers.quickfix"))
-  M.register(require("neoworkbench.providers.output"))
-  M.register(require("neoworkbench.providers.terminal"))
-  M.register(require("neoworkbench.providers.outline"))
+  local defaults = {
+    require("neoworkbench.providers.editor"),
+    require("neoworkbench.providers.explorer"),
+    require("neoworkbench.providers.problems"),
+    require("neoworkbench.providers.quickfix"),
+    require("neoworkbench.providers.output"),
+    require("neoworkbench.providers.terminal"),
+    require("neoworkbench.providers.outline"),
+  }
+  for _, provider in ipairs(defaults) do
+    if not M.registry[provider.name] then
+      M.register(provider)
+    end
+  end
 end
 
 return M

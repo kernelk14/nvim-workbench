@@ -47,14 +47,23 @@ end
 ---@param name string
 ---@param winid integer
 ---@param bufnr integer?
-function M.set(name, winid, bufnr)
-  M.state.panes[name] = { win = winid, buf = bufnr }
+---@param variant table? The third party implementation serving the pane.
+function M.set(name, winid, bufnr, variant)
+  M.state.panes[name] = { win = winid, buf = bufnr, variant = variant }
 end
 
 --- Forget a pane.
 ---@param name string
 function M.remove(name)
   M.state.panes[name] = nil
+end
+
+--- The variant that serves a pane.
+---@param name string
+---@return table?
+function M.variant(name)
+  local entry = M.state.panes[name]
+  return entry and entry.variant or nil
 end
 
 --- The names of the registered panes.
