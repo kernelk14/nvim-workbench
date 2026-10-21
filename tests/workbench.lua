@@ -138,6 +138,18 @@ T_check("focusing a pane without a workbench is harmless", workbench.focus_pane(
 T_check("refreshing without a workbench is harmless", workbench.refresh() == nil)
 T_check("relayout without a workbench is harmless", workbench.relayout() == nil)
 
+T_group("opening on startup")
+
+config.setup({ session = { enabled = false }, auto_open = false })
+T_check("the startup is off", workbench.auto_open() == false)
+T_check("the workbench stays closed", not workbench.is_open())
+
+config.setup({ session = { enabled = false }, auto_open = true })
+T_check("the startup opens the workbench", workbench.auto_open() == true)
+T_check("the workbench is open", workbench.is_open())
+T_check("the startup only happens once", workbench.auto_open() == false)
+workbench.close()
+
 T_group("opening twice")
 
 workbench.open()

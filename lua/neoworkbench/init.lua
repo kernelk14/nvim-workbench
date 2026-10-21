@@ -22,6 +22,27 @@ M.panel = nil
 
 local augroup = nil
 
+--- Whether the workbench was already opened by the startup.
+local auto_opened = false
+
+--- Open the workbench on startup.
+--- A file on the command line wins, the workbench does not get in the way of
+--- opening a file.
+---@return boolean ok
+function M.auto_open()
+  if auto_opened then
+    return false
+  end
+  if not config.get().auto_open then
+    return false
+  end
+  if vim.fn.argc() > 0 then
+    return false
+  end
+  auto_opened = true
+  return M.open()
+end
+
 --- Configure the workbench.
 ---@param opts table?
 ---@return table options
@@ -38,6 +59,12 @@ function M.setup(opts)
   M.create_commands()
   M.create_keymaps()
   M.create_autocmds()
+
+  -- The editor may already be up when the plugin is loaded, a lazy plugin
+  -- manager loads it when the VimEnter event fires.
+  if options.auto_open and vim.v.vim_did_enter == 1 then
+    vim.schedule(M.auto_open)
+  end
 
   return options
 end
@@ -602,6 +629,13 @@ function M.create_autocmds()
     vim.api.nvim_del_augroup_by_id(augroup)
   end
   augroup = vim.api.nvim_create_augroup("Neoworkbench", { clear = true })
+
+  vim.api.nvim_create_autocmd("VimEnter", {
+    group = augroup,
+    callback = function()
+      M.auto_open()
+    end,
+  })
 
   vim.api.nvim_create_autocmd("VimResized", {
     group = augroup,
