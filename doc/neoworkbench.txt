@@ -1,0 +1,334 @@
+*neoworkbench.txt*                A declarative IDE layout for Neovim
+
+                               A dependency free workbench that turns a
+                               layout tree into real windows, with a palette
+                               derived from the active colorscheme.
+
+==============================================================================
+CONTENTS                                               *neoworkbench-contents*
+
+  1. Introduction ........................ |neoworkbench-introduction|
+  2. Requirements ........................ |neoworkbench-requirements|
+  3. Installation ....................... |neoworkbench-installation|
+  4. Layout ............................. |neoworkbench-layout|
+  5. Panes .............................. |neoworkbench-panes|
+  6. Commands ........................... |neoworkbench-commands|
+  7. Keymaps ............................ |neoworkbench-keymaps|
+  8. Configuration ...................... |neoworkbench-configuration|
+  9. API ............................... |neoworkbench-api|
+ 10. Sessions ........................... |neoworkbench-sessions|
+ 11. Highlight groups ................... |neoworkbench-highlights|
+
+==============================================================================
+1. INTRODUCTION                                    *neoworkbench-introduction*
+
+neoworkbench builds a persistent, IDE like layout out of real Neovim splits.
+Nothing is a float, so every pane behaves like a normal window: it scrolls, it
+resizes, it keeps its buffers and it follows the file you are editing.
+
+The layout is described by a tree. A node is either a pane: >
+
+    { type = "leaf", pane = "editor", size = 0.75 }
+<
+or a container that lays its children out in a row or a column: >
+
+    { type = "row", children = { ... } }
+    { type = "col", children = { ... } }
+<
+A `size` between zero and one is a fraction of the parent, children without a
+size share whatever is left over. The space of the one cell separators
+Neovim draws between windows is taken out of the panes, so the sizes you ask
+for are the sizes you get.
+
+==============================================================================
+2. REQUIREMENTS                                    *neoworkbench-requirements*
+
+  - Neovim 0.10 or newer
+  - A Nerd Font for the icons, optional
+
+The plugin has no dependencies outside of Neovim itself.
+
+==============================================================================
+3. INSTALLATION                                    *neoworkbench-installation*
+
+lazy.nvim >
+
+    {
+      "kernelk14/nvim-workbench",
+      opts = {},
+    }
+<
+packer.nvim >
+
+    use({
+      "kernelk14/nvim-workbench",
+      config = function()
+        require("neoworkbench").setup()
+      end,
+    })
+<
+vim-plug >
+
+    Plug 'kernelk14/nvim-workbench'
+    lua require('neoworkbench').setup()
+<
+Manual >
+
+    git clone https://github.com/kernelk14/nvim-workbench \
+      ~/.local/share/nvim/site/pack/packer/start/nvim-workbench
+
+    lua require('neoworkbench').setup()
+<
+==============================================================================
+4. LAYOUT                                                  *neoworkbench-layout*
+
+Three layouts ship with the plugin.
+
+`default` ~
+    A file tree on the left, the editor next to it and a panel that spans the
+    full width at the bottom.
+
+    { type = "col", children = {
+        { type = "row", size = 0.7, children = {
+            { type = "leaf", pane = "explorer", size = 0.25 },
+            { type = "leaf", pane = "editor", size = 0.75 },
+        } },
+        { type = "leaf", pane = "panel", size = 0.3 },
+    } }
+<
+`focus` ~
+    The editor on its own.
+
+`ide` ~
+    A file tree, the editor and an outline, with the panel at the bottom.
+
+Add your own layout with the `layouts` option: >
+
+    require("neoworkbench").setup({
+      layouts = {
+        writing = {
+          type = "col",
+          children = {
+            { type = "leaf", pane = "editor", size = 0.85 },
+            { type = "leaf", pane = "panel", size = 0.15 },
+          },
+        },
+      },
+    })
+<
+==============================================================================
+5. PANES                                                    *neoworkbench-panes*
+
+A pane is a slot in the layout. Every pane is served by a provider.
+
+`editor` ~
+    The buffer that was being edited when the workbench opened.
+
+`explorer` ~
+    A dependency free file tree. `Enter` opens a file in the editor pane,
+    `Enter` on a directory collapses it, `r` refreshes the tree.
+
+`panel` ~
+    The bottom pane, it shows one of the panel providers.
+
+`problems` ~
+    The diagnostics of the workspace, `Enter` jumps to the problem.
+
+`quickfix` ~
+    The entries of the quickfix list.
+
+`output` ~
+    The log of the workbench.
+
+`terminal` ~
+    A terminal running inside the pane.
+
+`outline` ~
+    The symbols of the current document.
+
+A provider is a plain table, replace one to wire the pane to a third party
+plugin: >
+
+    require("neoworkbench.providers").register({
+      name = "explorer",
+      title = "Files",
+      buffer = function(ctx)
+        return require("neo-tree.sources.manager").get_buf()
+      end,
+    })
+<
+==============================================================================
+6. COMMANDS                                              *neoworkbench-commands*
+
+                                                       *:Workbench*
+:Workbench             Open the workbench.
+
+                                                   *:WorkbenchToggle*
+:WorkbenchToggle       Open the workbench when it is closed, close it when it
+                      is open.
+
+                                                    *:WorkbenchClose*
+:WorkbenchClose        Close the workbench and restore the editor.
+
+                                                    *:WorkbenchLayout*
+:WorkbenchLayout [name]
+                      Switch to another layout. Without a name the layouts
+                      are offered in a picker.
+
+                                                     *:WorkbenchFocus*
+:WorkbenchFocus [pane]
+                      Focus a pane, one of `editor`, `explorer`, `panel` or
+                      `outline`.
+
+                                                      *:WorkbenchPanel*
+:WorkbenchPanel [name]
+                      Show another provider in the panel. Without a name the
+                      providers are cycled through.
+
+                                                  *:WorkbenchRefresh*
+:WorkbenchRefresh      Refresh the content of every pane.
+
+                                                     *:WorkbenchSave*
+:WorkbenchSave         Save the session of the current project.
+
+==============================================================================
+7. KEYMAPS                                                *neoworkbench-keymaps*
+
+The default keymaps use `<leader>W` so they do not clash with the usual
+`<leader>w` for windows.
+
+    <leader>W        Toggle the workbench
+    <leader>Wh       Move the focus left
+    <leader>Wj       Move the focus down
+    <leader>Wk       Move the focus up
+    <leader>Wl       Move the focus right
+    <leader>Wp       Cycle the panel provider
+    <leader>Wi       Focus the explorer
+    <leader>Wt       Open the terminal panel
+    <leader>Wx       Open the problems panel
+    <leader>WL       Change the layout
+    <leader>Ws       Save the session
+    <leader>Wq       Close the workbench
+
+==============================================================================
+8. CONFIGURATION                                    *neoworkbench-configuration*
+
+Every option is optional. >
+
+    require("neoworkbench").setup({
+      layout = "default",
+      layouts = {},
+      title = true,
+      auto_open = false,
+      panels = { "problems", "quickfix", "output", "terminal" },
+      panel = "problems",
+      providers = {
+        explorer = "auto",
+        terminal = "auto",
+        problems = "auto",
+        outline = "auto",
+      },
+      session = {
+        enabled = true,
+        autosave = true,
+        restore = true,
+      },
+      keys = {
+        toggle = "<leader>W",
+        focus_left = "<leader>Wh",
+        focus_down = "<leader>Wj",
+        focus_up = "<leader>Wk",
+        focus_right = "<leader>Wl",
+        panel = "<leader>Wp",
+        explorer = "<leader>Wi",
+        terminal = "<leader>Wt",
+        problems = "<leader>Wx",
+        layout = "<leader>WL",
+        save = "<leader>Ws",
+        close = "<leader>Wq",
+      },
+    })
+<
+Set a keymap to `false` to remove it.
+
+==============================================================================
+9. API                                                        *neoworkbench-api*
+
+                                                       *neoworkbench.setup()*
+setup({opts})
+        Configure the plugin.
+
+                                                      *neoworkbench.open()*
+open({layout})
+        Open the workbench, optionally with a given layout.
+
+                                                    *neoworkbench.close()*
+close()
+        Close the workbench and restore the editor.
+
+                                                  *neoworkbench.toggle()*
+toggle()
+        Open the workbench when it is closed, close it when it is open.
+
+                                                  *neoworkbench.is_open()*
+is_open()
+        True when the workbench is open.
+
+                                             *neoworkbench.set_layout()*
+set_layout({name})
+        Switch to another layout.
+
+                                               *neoworkbench.focus_pane()*
+focus_pane({name})
+        Focus a pane by name.
+
+                                                   *neoworkbench.move()*
+move({direction})
+        Move the focus, one of `left`, `right`, `up` or `down`.
+
+                                               *neoworkbench.set_panel()*
+set_panel({name})
+        Show another provider in the panel.
+
+                                             *neoworkbench.cycle_panel()*
+cycle_panel()
+        Move to the next panel provider.
+
+                                               *neoworkbench.refresh()*
+refresh()
+        Refresh the content of every pane.
+
+                                             *neoworkbench.relayout()*
+relayout()
+        Recompute the layout and resize the panes.
+
+==============================================================================
+10. SESSIONS                                           *neoworkbench-sessions*
+
+The workbench remembers the layout and the panel of every project. The state
+is written to `stdpath("data")/neoworkbench/sessions` and restored the next
+time a project is opened.
+
+Set `session.enabled` to `false` to turn the feature off.
+
+==============================================================================
+11. HIGHLIGHT GROUPS                               *neoworkbench-highlights*
+
+The groups are registered with |neocore| and follow the colorscheme.
+
+    NeoworkbenchNormal        The default foreground
+    NeoworkbenchTitle         The title of a pane
+    NeoworkbenchMuted         Secondary text
+    NeoworkbenchDim           Faint text
+    NeoworkbenchAccent        The accent colour
+    NeoworkbenchAccent2       The second accent colour
+    NeoworkbenchDirectory     A directory in the explorer
+    NeoworkbenchFile          A file in the explorer
+    NeoworkbenchSelected      The selected entry
+    NeoworkbenchError         An error
+    NeoworkbenchWarn          A warning
+    NeoworkbenchInfo          An information
+    NeoworkbenchHint          A hint
+    NeoworkbenchOk            A success
+
+vim:tw=78:ts=8:noet:ft=help:norl:
