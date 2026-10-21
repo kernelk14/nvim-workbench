@@ -94,6 +94,43 @@ local function pane_title(name)
   return name:upper(), nil
 end
 
+--- The buffer the editor pane should show.
+---
+--- The current buffer is preferred, but a buffer of a plugin or a scratch
+--- buffer is skipped. The last file that was open is used instead, so opening
+--- the workbench from a plugin keeps the file in the editor.
+---@return integer bufnr
+local function capture_buffer()
+  local current = vim.api.nvim_get_current_buf()
+
+  -- A normal buffer holds a file, a scratch buffer or a buffer of a plugin
+  -- has a type of its own.
+  local function is_normal(buf)
+    if not vim.api.nvim_buf_is_loaded(buf) then
+      return false
+    end
+    return vim.bo[buf].buftype == ""
+  end
+
+  if is_normal(current) then
+    return current
+  end
+
+  local named = nil
+  local unnamed = nil
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if is_normal(buf) and vim.bo[buf].buflisted then
+      if vim.api.nvim_buf_get_name(buf) ~= "" then
+        named = buf
+      else
+        unnamed = buf
+      end
+    end
+  end
+
+  return named or unnamed or current
+end
+
 --- Open the workbench.
 ---@param layout_name string? The layout to open, defaults to the configured one.
 ---@return boolean ok
@@ -120,7 +157,7 @@ function M.open(layout_name)
     return false
   end
 
-  local captured_buf = vim.api.nvim_get_current_buf()
+  local captured_buf = capture_buffer()
   local root_win = vim.api.nvim_get_current_win()
 
   -- A plugin may have been installed since the last time the workbench was

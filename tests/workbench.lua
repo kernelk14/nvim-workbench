@@ -145,8 +145,24 @@ T_check("the workbench opens", workbench.is_open())
 T_check("opening it twice does nothing", workbench.open() == false)
 T_eq("the panes are still there", #pane.names(), 3)
 
+T_group("a plugin buffer is not captured")
+
+workbench.close()
+
+-- A buffer of a plugin, the kind the dashboard uses.
+local plugin_buf = vim.api.nvim_create_buf(false, true)
+vim.bo[plugin_buf].filetype = "neodash"
+vim.api.nvim_set_current_buf(plugin_buf)
+
+workbench.open()
+T_check("the workbench opens on a plugin buffer", workbench.is_open())
+T_eq("the editor keeps the file that was open", vim.api.nvim_win_get_buf(pane.win("editor")), before_buf)
+T_check("the plugin buffer is not in the editor", vim.api.nvim_win_get_buf(pane.win("editor")) ~= plugin_buf)
+workbench.close()
+
 T_group("relayout")
 
+workbench.open()
 workbench.relayout()
 T_check("the panes survive a relayout", pane.win("editor") ~= nil)
 
