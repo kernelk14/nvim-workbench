@@ -40,13 +40,39 @@ T_check("transparent keeps the text", transparent.text == palette.themes.aurora.
 
 T_group("auto palette follows the colorscheme")
 
-vim.cmd("colorscheme habamax")
+-- The highlight groups a colorscheme sets, defined here so the test does not
+-- depend on the colorschemes that ship with Neovim, they differ between the
+-- versions.
+local function use_colors(fg, bg)
+  for _, name in ipairs({
+    "Normal",
+    "Comment",
+    "Function",
+    "Statement",
+    "Constant",
+    "Type",
+    "String",
+    "DiagnosticError",
+    "DiagnosticWarn",
+    "DiagnosticInfo",
+    "DiagnosticOk",
+    "DiagnosticHint",
+  }) do
+    vim.api.nvim_set_hl(0, name, { fg = fg, bg = bg })
+  end
+end
+
+use_colors("#c9d5f3", "#0b1020")
 local dark = palette.auto_palette()
-vim.cmd("colorscheme morning")
+use_colors("#3f3a33", "#f6f3ec")
 local light = palette.auto_palette()
 T_check("auto palette reacts to the colorscheme", dark.bg ~= light.bg, dark.bg .. " vs " .. light.bg)
+T_eq("auto palette takes the background of a dark scheme", dark.bg, "#0b1020")
+T_eq("auto palette takes the background of a light scheme", light.bg, "#f6f3ec")
+T_check("auto palette derives a surface", dark.surface ~= dark.bg, dark.surface)
+T_check("auto palette makes a light surface darker", light.surface ~= light.bg, light.surface)
 
-vim.cmd("colorscheme habamax")
+use_colors("#c9d5f3", "#0b1020")
 local sampled = palette.auto_palette()
 local normal = vim.api.nvim_get_hl(0, { name = "Normal" })
 T_eq("auto palette takes the background from Normal", sampled.bg, string.format("#%06x", normal.bg))

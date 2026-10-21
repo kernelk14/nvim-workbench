@@ -9,12 +9,13 @@ on:
 
 jobs:
   test:
-    name: Test (${{ matrix.os }})
+    name: Test (${{ matrix.os }}, Neovim ${{ matrix.neovim }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
+        neovim: [v0.10.4, v0.11.3]
     steps:
       - uses: actions/checkout@v7
 
@@ -22,7 +23,7 @@ jobs:
         uses: rhysd/action-setup-vim@v1
         with:
           neovim: true
-          version: v0.10.4
+          version: ${{ matrix.neovim }}
 
       - name: Run the tests
         run: make test
