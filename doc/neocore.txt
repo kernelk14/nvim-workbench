@@ -1,0 +1,134 @@
+*neocore.txt*            The shared core of the neo plugin family
+
+                         A palette derived from the active colorscheme and a
+                         registry of highlight groups that plugins can define
+                         by their full name.
+
+==============================================================================
+CONTENTS                                                 *neocore-contents*
+
+  1. Introduction ........................... |neocore-introduction|
+  2. Requirements ........................... |neocore-requirements|
+  3. Installation ........................... |neocore-installation|
+  4. The palette ............................. |neocore-palette|
+  5. Highlight groups ....................... |neocore-highlights|
+  6. API .................................... |neocore-api|
+  7. Utilities .............................. |neocore-utilities|
+
+==============================================================================
+1. INTRODUCTION                                        *neocore-introduction*
+
+neocore is the piece the other neo plugins have in common. It does two
+things:
+
+  - it derives a palette from the colorscheme that is active, so a plugin
+    never has to hardcode a colour
+  - it keeps a registry of highlight groups, so several plugins can define
+    groups without stepping on each other
+
+The module has no dependencies outside of Neovim itself.
+
+==============================================================================
+2. REQUIREMENTS                                        *neocore-requirements*
+
+  - Neovim 0.10 or newer
+
+==============================================================================
+3. INSTALLATION                                        *neocore-installation*
+
+neocore ships inside the neoworkbench repository, install that: >
+
+    {
+      "kernelk14/nvim-workbench",
+      opts = {},
+    }
+<
+It can also be used on its own, the module lives in `lua/neocore`.
+
+==============================================================================
+4. THE PALETTE                                              *neocore-palette*
+
+Six palettes ship with the core, `aurora`, `mocha`, `nord`, `ember`, `mono` and
+`daylight`, plus `auto` which samples the active colorscheme.
+
+A palette holds these keys: >
+
+    bg           surface      surface_alt  border
+    text         muted        dim          accent
+    accent2      accent3      green        yellow
+    red          cyan
+<
+The `auto` palette reads `Normal`, `Comment`, `Function`, `Statement`,
+`Constant` and the diagnostic groups of the colorscheme and blends the
+remaining colours itself. It is rebuilt whenever the colorscheme changes.
+
+==============================================================================
+5. HIGHLIGHT GROUPS                                   *neocore-highlights*
+
+Groups are registered under their full name, so a plugin is free to use any
+name it likes: >
+
+    require("neocore").hl.define("MyPluginBorder", { fg = "border" })
+    require("neocore").hl.apply(require("neocore").colors())
+<
+Colours can be a literal, `"#ff0000"` or `"NONE"`, or the name of a palette
+key, `"accent"`. A key that is not part of the palette is left alone.
+
+==============================================================================
+6. API                                                        *neocore-api*
+
+                                                       *neocore.setup()*
+setup({opts})
+        Configure the core, `theme` and `transparent`.
+
+                                                     *neocore.colors()*
+colors()
+        The resolved palette currently in use.
+
+                                                *neocore.palette_names()*
+palette_names()
+        The names of the built in palettes.
+
+                                                       *neocore.apply()*
+apply()
+        Resample the colorscheme and re-apply every registered group.
+
+                                                      *neocore.define()*
+define({name}, {spec})
+        Register a highlight group and apply it.
+
+                                                    *neocore.invalidate()*
+invalidate()
+        Drop the cached palette.
+
+                                                        *neocore.attach()*
+attach()
+        Re-apply the groups whenever the colorscheme changes.
+
+==============================================================================
+7. UTILITIES                                              *neocore-utilities*
+
+`require("neocore.util")` holds the text and colour helpers: >
+
+    util.swidth(text)         The display width of a string
+    util.truncate(text, w)     Cut a string to a display width
+    util.norm_segs(value)      Normalise a value into a list of segments
+    util.segs_width(segs)      The display width of a list of segments
+    util.clip_segs(segs, w)    Clip a list of segments to a width
+    util.row(left, right, w)  Pin a row to both sides of a width
+    util.center(segs, w)      Centre a list of segments
+    util.blend(a, b, ratio)   Blend two colours
+    util.mix(stops, ratio)    Sample a gradient
+    util.merge(base, other)    Deep merge two tables
+    util.distribute(total, w) Split a total across weights
+<
+`require("neocore.win")` holds the window helpers: >
+
+    win.open_split(buf, opts) Open a window as a split
+    win.set_title(win, left)  Set the winbar of a window
+    win.winbar(left, right)   Build a winbar string
+    win.focus(win)            Move the cursor to a window
+    win.close(win)            Close a window
+    win.size()                The size of the editor area
+<
+vim:tw=78:ts=8:noet:ft=help:norl:

@@ -1,0 +1,16 @@
+*.log
+.luarc.json
+.selene-cache
+tags
+
+# Neovim swap, undo, and backup files
+*.swp
+*.swo
+*.un~
+*.bak
+*~
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+desktop.ini
