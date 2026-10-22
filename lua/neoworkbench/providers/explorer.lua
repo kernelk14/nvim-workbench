@@ -175,7 +175,7 @@ function M.root_of(dir)
   local current = vim.fn.fnamemodify(dir, ":p")
   while current and current ~= "" do
     if vim.fn.isdirectory(current .. "/.git") == 1 or vim.fn.filereadable(current .. "/.git") == 1 then
-      return current
+      return current:gsub("[/\\]$", "")
     end
     local parent = vim.fn.fnamemodify(current, ":h")
     if parent == current then
@@ -183,7 +183,7 @@ function M.root_of(dir)
     end
     current = parent
   end
-  return vim.fn.fnamemodify(dir, ":p")
+  return vim.fn.fnamemodify(dir, ":p"):gsub("[/\\]$", "")
 end
 
 --- The entries of a directory, directories first.
