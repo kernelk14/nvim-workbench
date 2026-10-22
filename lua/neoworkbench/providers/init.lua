@@ -136,6 +136,11 @@ function M.names()
   return names
 end
 
+--- The buffers the workbench made itself.
+--- A terminal takes over the buffer it runs in and renames it, so the buffers
+--- are remembered here and not found by their name.
+M.owned = {}
+
 --- Create a scratch buffer for a pane.
 ---@param name string
 ---@param filetype string?
@@ -143,13 +148,19 @@ end
 function M.scratch(name, filetype)
   local bufnr = vim.api.nvim_create_buf(false, true)
   vim.bo[bufnr].buflisted = false
-  vim.bo[bufnr].bufhidden = "wipe"
+  vim.bo[bufnr].bufhidden = "hide"
   vim.bo[bufnr].swapfile = false
   if filetype then
     vim.bo[bufnr].filetype = filetype
   end
   pcall(vim.api.nvim_buf_set_name, bufnr, "neoworkbench://" .. name)
+  M.owned[bufnr] = true
   return bufnr
+end
+
+--- Forget the buffers of the workbench.
+function M.forget()
+  M.owned = {}
 end
 
 --- Write lines into a buffer.

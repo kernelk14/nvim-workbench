@@ -69,9 +69,70 @@ function M.clear_title(winid)
   vim.wo[winid].winbar = ""
 end
 
+--- The options that M.plain changes.
+M.plain_options = {
+  "number",
+  "relativenumber",
+  "signcolumn",
+  "cursorline",
+  "cursorcolumn",
+  "foldcolumn",
+  "list",
+  "spell",
+  "wrap",
+}
+
+--- Make a window plain, without the decorations of an editing window.
+--- A pane that shows a list of things has no use for line numbers and the
+--- sign column of the editor.
+---@param winid integer
+function M.plain(winid)
+  if not vim.api.nvim_win_is_valid(winid) then
+    return
+  end
+  local wo = vim.wo[winid]
+  wo.number = false
+  wo.relativenumber = false
+  wo.signcolumn = "no"
+  wo.cursorline = false
+  wo.cursorcolumn = false
+  wo.foldcolumn = "0"
+  wo.list = false
+  wo.spell = false
+  wo.wrap = false
+end
+
+--- Remember the options of a window that M.plain changes.
+---@param winid integer
+---@return table? snapshot
+function M.snapshot(winid)
+  if not vim.api.nvim_win_is_valid(winid) then
+    return nil
+  end
+  local values = {}
+  for _, name in ipairs(M.plain_options) do
+    values[name] = vim.api.nvim_get_option_value(name, { win = winid })
+  end
+  return values
+end
+
+--- Put the options of a window back.
+---@param winid integer
+---@param snapshot table?
+function M.restore(winid, snapshot)
+  if not snapshot or not vim.api.nvim_win_is_valid(winid) then
+    return
+  end
+  for name, value in pairs(snapshot) do
+    pcall(vim.api.nvim_set_option_value, name, value, { win = winid })
+  end
+end
+
 --- Open a window as a split of another window.
 --- Splitting is the only way to build a layout that spans the full editor,
 --- floats cannot be tiled.
+--- The window keeps the options of the user, a pane that should be plain
+--- says so with M.plain.
 ---@param bufnr integer
 ---@param opts table? `split`, `win`, `width`, `height`, `title`, `title_hl`, `noautocmd`
 ---@return integer winid
@@ -82,7 +143,6 @@ function M.open_split(bufnr, opts)
     win = opts.win or -1,
     width = opts.width,
     height = opts.height,
-    style = "minimal",
     noautocmd = opts.noautocmd or false,
   }
 

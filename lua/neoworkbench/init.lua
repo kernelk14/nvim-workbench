@@ -26,8 +26,8 @@ local augroup = nil
 local auto_opened = false
 
 --- Open the workbench on startup.
---- A file on the command line wins, the workbench does not get in the way of
---- opening a file.
+--- A file that was given on the command line is not in the way, it ends up in
+--- the editor pane of the workbench.
 ---@return boolean ok
 function M.auto_open()
   if auto_opened then
@@ -36,11 +36,45 @@ function M.auto_open()
   if not config.get().auto_open then
     return false
   end
-  if vim.fn.argc() > 0 then
-    return false
-  end
   auto_opened = true
   return M.open()
+end
+
+--- A file was opened.
+---
+--- The workbench is the place where files are edited, so a file goes to the
+--- editor pane. When the workbench is closed the file opens it.
+---@param bufnr integer
+local function file_opened(bufnr)
+  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+    return
+  end
+  if vim.bo[bufnr].buftype ~= "" then
+    return
+  end
+  local name = vim.api.nvim_buf_get_name(bufnr)
+  if name == "" or name:find("neoworkbench://", 1, true) then
+    return
+  end
+
+  if not pane.is_open() then
+    if not config.get().auto_open then
+      return
+    end
+    -- The file is still being read, the workbench waits for it.
+    vim.schedule(function()
+      if not pane.is_open() then
+        M.open()
+      end
+    end)
+    return
+  end
+
+  -- The file belongs in the editor pane, wherever it was opened.
+  local editor = pane.win("editor")
+  if editor and neowin.is_valid(editor) and vim.api.nvim_win_get_buf(editor) ~= bufnr then
+    pcall(vim.api.nvim_win_set_buf, editor, bufnr)
+  end
 end
 
 --- Configure the workbench.
@@ -187,6 +221,10 @@ function M.open(layout_name)
   local captured_buf = capture_buffer()
   local root_win = vim.api.nvim_get_current_win()
 
+  -- The window of the user becomes a pane, its options are put back when the
+  -- workbench closes.
+  local root_options = neowin.snapshot(root_win)
+
   -- A plugin may have been installed since the last time the workbench was
   -- opened, so the lookups are done again.
   providers.invalidate()
@@ -209,6 +247,7 @@ function M.open(layout_name)
   pane.state.tree = tree
   pane.state.rects = rects
   pane.state.root_win = root_win
+  pane.state.root_options = root_options
   pane.state.captured_buf = captured_buf
 
   local ctx = {
@@ -249,6 +288,12 @@ function M.open(layout_name)
           end
           neowin.set_title(winid, left)
         end
+      end
+
+      -- The editor keeps the options of the user, the other panes show a list
+      -- of things and have no use for line numbers.
+      if pane_name ~= "editor" then
+        neowin.plain(winid)
       end
 
       pane.set(pane_name, winid, bufnr, variant)
@@ -308,22 +353,35 @@ function M.close()
     end
   end
 
-  -- The windows go first, the scratch buffers are wiped with them.
-  apply.close(editor_buf)
-
-  -- What is left are the buffers that hide themselves, a terminal among
-  -- them. Only the scratch buffers of the workbench are touched, the buffer
-  -- of the editor is the file of the user.
-  for _, bufnr in pairs(pane.state.buffers or {}) do
-    if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
-      if vim.api.nvim_buf_get_name(bufnr):find("neoworkbench://", 1, true) == 1 then
-        if vim.bo[bufnr].buftype == "terminal" then
-          pcall(vim.fn.jobstop, vim.b[bufnr].terminal_job_id)
-        end
-        pcall(vim.api.nvim_buf_delete, bufnr, { force = true })
+  -- The terminals are stopped first, a window that goes away while its
+  -- terminal is still running leaves Neovim in a bad state. The job is waited
+  -- for, its last words are still on the way and they need the buffer.
+  for bufnr in pairs(providers.owned or {}) do
+    if vim.api.nvim_buf_is_valid(bufnr) and vim.bo[bufnr].buftype == "terminal" then
+      local id = vim.b[bufnr].terminal_job_id
+      if id then
+        pcall(vim.fn.jobstop, id)
+        pcall(vim.fn.jobwait, { id }, 1000)
       end
     end
   end
+
+  -- The windows go first, the scratch buffers are wiped with them.
+  apply.close(editor_buf)
+
+  -- The window of the user gets its options back.
+  if pane.state.root_win then
+    neowin.restore(pane.state.root_win, pane.state.root_options)
+  end
+
+  -- What is left are the buffers of the workbench. The file of the user is not
+  -- one of them and is left alone.
+  for bufnr in pairs(providers.owned or {}) do
+    if vim.api.nvim_buf_is_valid(bufnr) then
+      pcall(vim.api.nvim_buf_delete, bufnr, { force = true })
+    end
+  end
+  providers.forget()
 
   pane.reset()
 end
@@ -407,6 +465,7 @@ function M.set_panel(name)
     return false
   end
 
+  local previous = M.panel
   M.panel = name
   local winid = pane.win("panel")
   if not winid then
@@ -434,12 +493,15 @@ function M.set_panel(name)
     pcall(variant.open, ctx, winid)
   else
     bufnr = provider_buffer(name, ctx)
-    if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
-      pcall(vim.api.nvim_win_set_buf, winid, bufnr)
-      -- The provider may need the window, a terminal takes it over.
-      if provider and provider.attach then
-        pcall(provider.attach, ctx, winid)
-      end
+  end
+
+  -- A terminal that is put aside keeps running, it comes back alive when the
+  -- panel is asked for it again. It is stopped when the workbench closes.
+  if not variant and bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+    pcall(vim.api.nvim_win_set_buf, winid, bufnr)
+    -- The provider may need the window, a terminal takes it over.
+    if provider and provider.attach then
+      pcall(provider.attach, ctx, winid)
     end
   end
   pane.set("panel", winid, bufnr, variant)
@@ -684,6 +746,16 @@ function M.create_autocmds()
     group = augroup,
     callback = function()
       M.relayout()
+    end,
+  })
+
+  -- A file that is opened goes to the editor pane, and it opens the workbench
+  -- when it is closed. BufEnter catches the files that are already in the
+  -- buffer list, they are not read again.
+  vim.api.nvim_create_autocmd({ "BufReadPost", "BufNewFile", "BufEnter" }, {
+    group = augroup,
+    callback = function(event)
+      file_opened(event.buf)
     end,
   })
 

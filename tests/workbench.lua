@@ -136,6 +136,87 @@ T_check("the explorer is gone", pane.win("explorer") == nil)
 workbench.set_layout("default")
 T_check("the default layout comes back", pane.win("explorer") ~= nil)
 
+T_group("the window options")
+
+workbench.close()
+
+-- The editor keeps the options of the user.
+vim.wo.number = true
+vim.wo.relativenumber = true
+vim.wo.signcolumn = "yes"
+
+workbench.open()
+T_eq("the editor has line numbers", vim.wo[pane.win("editor")].number, true)
+T_eq("the editor has relative line numbers", vim.wo[pane.win("editor")].relativenumber, true)
+T_eq("the editor has the sign column", vim.wo[pane.win("editor")].signcolumn, "yes")
+
+-- The other panes show a list of things.
+T_eq("the explorer has no line numbers", vim.wo[pane.win("explorer")].number, false)
+T_eq("the explorer has no relative line numbers", vim.wo[pane.win("explorer")].relativenumber, false)
+T_eq("the explorer has no sign column", vim.wo[pane.win("explorer")].signcolumn, "no")
+T_eq("the panel has no line numbers", vim.wo[pane.win("panel")].number, false)
+T_eq("the panel has no sign column", vim.wo[pane.win("panel")].signcolumn, "no")
+
+-- The window of the user gets its options back.
+workbench.close()
+T_eq("the window has line numbers again", vim.wo[vim.api.nvim_get_current_win()].number, true)
+T_eq("the window has the sign column again", vim.wo[vim.api.nvim_get_current_win()].signcolumn, "yes")
+
+T_group("a file that is opened")
+
+-- A file that is opened while the workbench is open goes to the editor pane.
+local opened = vim.fn.tempname() .. ".txt"
+vim.fn.writefile({ "opened" }, opened)
+
+workbench.open()
+workbench.focus_pane("editor")
+vim.cmd("edit " .. vim.fn.fnameescape(opened))
+vim.wait(1000, function()
+  return pane.win("editor") ~= nil and vim.api.nvim_win_get_buf(pane.win("editor")) == vim.fn.bufadd(opened)
+end, 20)
+
+T_eq(
+  "the file is in the editor pane",
+  vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(pane.win("editor"))),
+  vim.fn.fnamemodify(opened, ":p")
+)
+T_eq("the workbench is still open", workbench.is_open(), true)
+
+-- A file that is opened while the workbench is closed opens it.
+config.setup({ session = { enabled = false }, auto_open = true })
+workbench.close()
+T_check("the workbench is closed", not workbench.is_open())
+vim.cmd("edit " .. vim.fn.fnameescape(opened))
+vim.wait(2000, function()
+  return workbench.is_open()
+end, 20)
+
+T_check("the file opened the workbench", workbench.is_open())
+T_eq(
+  "the file is in the editor pane",
+  vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(pane.win("editor"))),
+  vim.fn.fnamemodify(opened, ":p")
+)
+
+-- A file that is already in the buffer list opens it as well.
+local second = vim.fn.tempname() .. ".txt"
+vim.fn.writefile({ "second" }, second)
+vim.cmd("edit " .. vim.fn.fnameescape(second))
+workbench.close()
+T_check("the workbench is closed", not workbench.is_open())
+
+vim.cmd("buffer " .. vim.fn.bufnr(opened))
+vim.wait(2000, function()
+  return workbench.is_open()
+end, 20)
+
+T_check("a file that is already open opens the workbench", workbench.is_open())
+T_eq(
+  "the file is in the editor pane",
+  vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(pane.win("editor"))),
+  vim.fn.fnamemodify(opened, ":p")
+)
+
 T_group("closing the workbench")
 
 -- A file that was opened while the workbench was open stays open.

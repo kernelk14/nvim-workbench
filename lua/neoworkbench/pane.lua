@@ -10,6 +10,7 @@ M.state = {
   rects = {},
   panes = {},
   root_win = nil,
+  root_options = nil,
   captured_buf = nil,
 }
 
@@ -23,6 +24,7 @@ function M.reset()
     panes = {},
     buffers = {},
     root_win = nil,
+    root_options = nil,
     captured_buf = nil,
   }
 end
