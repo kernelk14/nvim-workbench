@@ -92,9 +92,11 @@ M.defaults = {
     explorer = "<leader>Wi",
     terminal = "<leader>Wt",
     problems = "<leader>Wx",
+    output = "<leader>Wo",
+    quickfix = "<leader>Wq",
     layout = "<leader>WL",
     save = "<leader>Ws",
-    close = "<leader>Wq",
+    close = "<leader>Wc",
   },
 }
 

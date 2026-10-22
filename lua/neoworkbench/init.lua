@@ -28,7 +28,8 @@ local auto_opened = false
 
 --- Open the workbench on startup.
 --- A file that was given on the command line is not in the way, it ends up in
---- the editor pane of the workbench.
+--- the editor pane of the workbench. No file means the dashboard handles the
+--- start screen, the workbench stays closed.
 ---@return boolean ok
 function M.auto_open()
   if auto_opened then
@@ -751,6 +752,12 @@ function M.create_keymaps()
   map(keys.problems, function()
     M.set_panel("problems")
   end, "Open the problems panel")
+  map(keys.output, function()
+    M.set_panel("output")
+  end, "Open the output panel")
+  map(keys.quickfix, function()
+    M.set_panel("quickfix")
+  end, "Open the quickfix panel")
   map(keys.layout, function()
     vim.cmd("WorkbenchLayout")
   end, "Change the workbench layout")
@@ -772,6 +779,14 @@ function M.create_autocmds()
   vim.api.nvim_create_autocmd("VimEnter", {
     group = augroup,
     callback = function()
+      -- Only open when a file is given. No arguments or a lone dot means the
+      -- dashboard is the start screen.
+      if vim.fn.argc() == 0 then
+        return
+      end
+      if vim.fn.argc() == 1 and vim.fn.argv(0) == "." then
+        return
+      end
       M.auto_open()
     end,
   })

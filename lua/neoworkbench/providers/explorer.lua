@@ -344,7 +344,7 @@ function M.render(ctx, bufnr)
     M.state.paths[#M.state.paths + 1] = vim.fn.fnamemodify(dir, ":h")
   end
 
-  local function walk(current, depth, prefix, is_last)
+  local function walk(current, depth)
     local dirs, files = entries(current)
     local all = {}
     for _, name in ipairs(dirs) do
@@ -357,10 +357,10 @@ function M.render(ctx, bufnr)
     for i, entry in ipairs(all) do
       local last = i == #all
       local path = current .. "/" .. entry.name
-      local collapsed = entry.kind == "dir" and M.state.collapsed[path] == true
+      -- Folders are collapsed by default, the user expands them.
+      local collapsed = entry.kind == "dir" and M.state.collapsed[path] ~= false
 
-      -- The guide of this level.
-      local guide = last and M.glyphs.last or M.glyphs.branch
+      -- The indent is just spaces, VS Code does not draw guide lines.
       local indent_str = string.rep("  ", depth)
 
       local icon, hl
@@ -374,39 +374,29 @@ function M.render(ctx, bufnr)
 
       -- The status of the repository.
       local status = ""
-      local status_hl = nil
-      if entry.kind == "file" then
+      if entry.kind == "file" or entry.kind == "dir" then
         local letter = git_letter(path)
         if letter then
           status = "  " .. letter
-          status_hl = git_color(path)
-        end
-      else
-        local letter = git_letter(path)
-        if letter then
-          status = "  " .. letter
-          status_hl = git_color(path)
         end
       end
 
       -- A selected entry is marked.
       local marker = M.state.selected[path] and "● " or ""
 
-      local line =
-        string.format("%s%s%s %s %s%s", indent_str, guide, M.glyphs.space, icon, marker .. entry.name, status)
+      local line = string.format("%s%s %s%s", indent_str, icon, marker .. entry.name, status)
 
       lines[#lines + 1] = line
       M.state.paths[#M.state.paths + 1] = path
 
-      -- The guides of the children.
+      -- The children of an expanded directory.
       if entry.kind == "dir" and not collapsed then
-        local child_prefix = indent_str .. (last and "   " or M.glyphs.guide .. "  ")
-        walk(path, depth + 1, child_prefix, false)
+        walk(path, depth + 1, false)
       end
     end
   end
 
-  walk(dir, 0, "", false)
+  walk(dir, 0, false)
 
   if #lines == 0 then
     lines[1] = "  The directory is empty"
