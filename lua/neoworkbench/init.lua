@@ -510,14 +510,26 @@ function M.create_commands()
   vim.api.nvim_create_user_command("WorkbenchLayout", function(args)
     if args.args ~= "" then
       M.set_layout(args.args)
-    else
-      local names = config.layout_names()
-      vim.ui.select(names, { prompt = "Layout" }, function(choice)
-        if choice then
-          M.set_layout(choice)
-        end
-      end)
+      return
     end
+
+    local names = config.layout_names()
+    if #names == 0 then
+      return
+    end
+
+    -- A numbered list and not a fuzzy finder, the number of the layout is
+    -- typed. A picker that filters would swallow it.
+    local ok, choice = pcall(vim.fn.inputlist, names)
+    if not ok or choice == nil or choice == "" then
+      return
+    end
+
+    -- The windows are rebuilt, that cannot happen while the prompt is still
+    -- open, the switch waits for it to be gone.
+    vim.schedule(function()
+      M.set_layout(choice)
+    end)
   end, {
     desc = "Switch the workbench layout",
     nargs = "?",
