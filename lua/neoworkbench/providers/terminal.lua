@@ -11,21 +11,37 @@ M.icon = "󰞊"
 --- The command the terminal runs, an interactive shell when it is empty.
 M.command = nil
 
---- Start the terminal inside a buffer.
----@param bufnr integer
+--- Start a terminal in the window of the pane.
+--- A terminal always takes over the window that is current, so the window of
+--- the pane has to be focused and hold the buffer first.
+---@param winid integer
 ---@return boolean ok
-local function start(bufnr)
-  local shell = vim.o.shell
-  local args = { shell }
-  if M.command and M.command ~= "" then
-    args = { shell, "-c", M.command }
+local function start(winid)
+  if not winid or not vim.api.nvim_win_is_valid(winid) then
+    return false
   end
 
-  local ok = pcall(vim.fn.termopen, bufnr, args)
+  local bufnr = vim.api.nvim_win_get_buf(winid)
+  if vim.bo[bufnr].buftype == "terminal" then
+    return true
+  end
+
+  local cmd = { vim.o.shell }
+  if M.command and M.command ~= "" then
+    cmd = { vim.o.shell, "-c", M.command }
+  end
+
+  vim.api.nvim_set_current_win(winid)
+  vim.api.nvim_win_set_buf(winid, bufnr)
+
+  local ok = pcall(vim.fn.jobstart, cmd, { term = true })
   if not ok then
     return false
   end
+
   vim.bo[bufnr].filetype = "terminal"
+  -- The terminal has to survive a switch to another panel.
+  vim.bo[bufnr].bufhidden = "hide"
   return true
 end
 
@@ -39,9 +55,15 @@ end
 ---@param ctx table
 ---@return integer
 function M.buffer(ctx)
-  local bufnr = providers.scratch(M.name, "neoworkbench-terminal")
-  start(bufnr)
-  return bufnr
+  -- The terminal is started in attach, it needs the window of the pane.
+  return providers.scratch(M.name, "neoworkbench-terminal")
+end
+
+--- Start the terminal in the window of the pane.
+---@param ctx table
+---@param winid integer
+function M.attach(ctx, winid)
+  start(winid)
 end
 
 return M

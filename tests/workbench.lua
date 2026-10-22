@@ -110,6 +110,22 @@ workbench.cycle_panel()
 T_check("the panel cycles to another provider", vim.bo[pane.buf("panel")].filetype ~= "neoworkbench-quickfix")
 T_check("an unknown provider is rejected", workbench.set_panel("does-not-exist") == false)
 
+T_group("the terminal panel")
+
+-- A terminal takes over the window that is current, it must not take the
+-- editor with it.
+local editor_win = pane.win("editor")
+workbench.focus_pane("editor")
+workbench.set_panel("terminal")
+
+T_check("the editor window survives the terminal", vim.api.nvim_win_is_valid(editor_win), editor_win)
+T_eq("the editor keeps its pane", pane.win("editor"), editor_win)
+T_eq("the terminal is in the panel", vim.bo[pane.buf("panel")].buftype, "terminal")
+T_eq("the editor is not a terminal", vim.bo[vim.api.nvim_win_get_buf(editor_win)].buftype, "")
+T_eq("the windows are still three", #vim.api.nvim_tabpage_list_wins(0), 3)
+
+workbench.set_panel("problems")
+
 T_group("switching the layout")
 
 workbench.set_layout("focus")

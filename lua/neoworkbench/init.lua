@@ -297,7 +297,23 @@ function M.close()
     end
   end
 
+  -- The windows go first, the scratch buffers are wiped with them.
   apply.close(editor_buf)
+
+  -- What is left are the buffers that hide themselves, a terminal among
+  -- them. Only the scratch buffers of the workbench are touched, the buffer
+  -- of the editor is the file of the user.
+  for _, bufnr in pairs(pane.state.buffers or {}) do
+    if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+      if vim.api.nvim_buf_get_name(bufnr):find("neoworkbench://", 1, true) == 1 then
+        if vim.bo[bufnr].buftype == "terminal" then
+          pcall(vim.fn.jobstop, vim.b[bufnr].terminal_job_id)
+        end
+        pcall(vim.api.nvim_buf_delete, bufnr, { force = true })
+      end
+    end
+  end
+
   pane.reset()
 end
 
@@ -409,6 +425,10 @@ function M.set_panel(name)
     bufnr = provider_buffer(name, ctx)
     if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
       pcall(vim.api.nvim_win_set_buf, winid, bufnr)
+      -- The provider may need the window, a terminal takes it over.
+      if provider and provider.attach then
+        pcall(provider.attach, ctx, winid)
+      end
     end
   end
   pane.set("panel", winid, bufnr, variant)
