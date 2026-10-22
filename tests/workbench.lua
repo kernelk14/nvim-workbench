@@ -138,11 +138,16 @@ T_check("the default layout comes back", pane.win("explorer") ~= nil)
 
 T_group("closing the workbench")
 
+-- A file that was opened while the workbench was open stays open.
+local other = vim.api.nvim_create_buf(true, false)
+vim.api.nvim_buf_set_name(other, vim.fn.tempname() .. ".txt")
+vim.api.nvim_win_set_buf(pane.win("editor"), other)
+
 local root_win = pane.state.root_win
 workbench.close()
 T_check("the workbench is closed", not workbench.is_open())
 T_eq("a single window is left", #vim.api.nvim_tabpage_list_wins(0), 1)
-T_eq("the editor buffer survives", vim.api.nvim_get_current_buf(), before_buf)
+T_eq("the editor buffer survives", vim.api.nvim_get_current_buf(), other)
 T_eq("the window is the original one", vim.api.nvim_get_current_win(), root_win)
 
 T_group("the edges")
@@ -177,6 +182,9 @@ T_group("a plugin buffer is not captured")
 
 workbench.close()
 
+-- The file that is open when the workbench opens.
+local file_buf = vim.api.nvim_get_current_buf()
+
 -- A buffer of a plugin, the kind the dashboard uses.
 local plugin_buf = vim.api.nvim_create_buf(false, true)
 vim.bo[plugin_buf].filetype = "neodash"
@@ -184,7 +192,7 @@ vim.api.nvim_set_current_buf(plugin_buf)
 
 workbench.open()
 T_check("the workbench opens on a plugin buffer", workbench.is_open())
-T_eq("the editor keeps the file that was open", vim.api.nvim_win_get_buf(pane.win("editor")), before_buf)
+T_eq("the editor keeps the file that was open", vim.api.nvim_win_get_buf(pane.win("editor")), file_buf)
 T_check("the plugin buffer is not in the editor", vim.api.nvim_win_get_buf(pane.win("editor")) ~= plugin_buf)
 workbench.close()
 

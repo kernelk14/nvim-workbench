@@ -272,7 +272,18 @@ function M.close()
   end
 
   local options = config.get()
+
+  -- The file that survives is the one in the editor pane, not the one that
+  -- was captured when the workbench opened. A file that was opened from the
+  -- explorer stays open.
+  local editor_win = pane.win("editor")
   local editor_buf = pane.buf("editor")
+  if editor_win and neowin.is_valid(editor_win) then
+    local current = vim.api.nvim_win_get_buf(editor_win)
+    if current and vim.api.nvim_buf_is_valid(current) then
+      editor_buf = current
+    end
+  end
 
   if options.session and options.session.enabled and options.session.autosave then
     session.save({
