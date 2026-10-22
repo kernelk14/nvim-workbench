@@ -40,20 +40,30 @@ function M.auto_open()
   return M.open()
 end
 
+--- Whether the buffer holds a file of the user.
+---@param bufnr integer
+---@return boolean
+local function is_a_file(bufnr)
+  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+    return false
+  end
+  if vim.bo[bufnr].buftype ~= "" then
+    return false
+  end
+  local name = vim.api.nvim_buf_get_name(bufnr)
+  if name == "" or name:find("neoworkbench://", 1, true) then
+    return false
+  end
+  return true
+end
+
 --- A file was opened.
 ---
 --- The workbench is the place where files are edited, so a file goes to the
 --- editor pane. When the workbench is closed the file opens it.
 ---@param bufnr integer
 local function file_opened(bufnr)
-  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
-    return
-  end
-  if vim.bo[bufnr].buftype ~= "" then
-    return
-  end
-  local name = vim.api.nvim_buf_get_name(bufnr)
-  if name == "" or name:find("neoworkbench://", 1, true) then
+  if not is_a_file(bufnr) then
     return
   end
 
@@ -75,6 +85,29 @@ local function file_opened(bufnr)
   if editor and neowin.is_valid(editor) and vim.api.nvim_win_get_buf(editor) ~= bufnr then
     pcall(vim.api.nvim_win_set_buf, editor, bufnr)
   end
+end
+
+--- A buffer was focused.
+---
+--- A file that is already open opens the workbench when it is closed. The panes
+--- of an open workbench are left alone, moving between them is not opening a
+--- file.
+---@param bufnr integer
+local function buffer_focused(bufnr)
+  if pane.is_open() then
+    return
+  end
+  if not is_a_file(bufnr) then
+    return
+  end
+  if not config.get().auto_open then
+    return
+  end
+  vim.schedule(function()
+    if not pane.is_open() then
+      M.open()
+    end
+  end)
 end
 
 --- Configure the workbench.
@@ -750,12 +783,19 @@ function M.create_autocmds()
   })
 
   -- A file that is opened goes to the editor pane, and it opens the workbench
-  -- when it is closed. BufEnter catches the files that are already in the
-  -- buffer list, they are not read again.
-  vim.api.nvim_create_autocmd({ "BufReadPost", "BufNewFile", "BufEnter" }, {
+  -- when it is closed. A buffer that is only focused opens the workbench when
+  -- it is closed, the panes of an open workbench are left alone.
+  vim.api.nvim_create_autocmd({ "BufReadPost", "BufNewFile" }, {
     group = augroup,
     callback = function(event)
       file_opened(event.buf)
+    end,
+  })
+
+  vim.api.nvim_create_autocmd("BufEnter", {
+    group = augroup,
+    callback = function(event)
+      buffer_focused(event.buf)
     end,
   })
 
