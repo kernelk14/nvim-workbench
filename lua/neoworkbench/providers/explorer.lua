@@ -37,6 +37,42 @@ M.name = "explorer"
 M.title = "Explorer"
 M.icon = "󰉋"
 
+--- Alternative implementations of the explorer.
+--- Both of them render into the window that is current when they are opened,
+--- which is what makes it possible to host them in a pane.
+M.variants = {
+  oil = {
+    module = "oil",
+    priority = 20,
+    open = function(ctx, winid)
+      vim.api.nvim_set_current_win(winid)
+      require("oil").open()
+    end,
+    close = function(ctx, winid)
+      pcall(function()
+        require("oil").close()
+      end)
+    end,
+  },
+  ["neo-tree"] = {
+    module = "neo-tree.command",
+    priority = 10,
+    open = function(ctx, winid)
+      vim.api.nvim_set_current_win(winid)
+      require("neo-tree.command").execute({
+        action = "focus",
+        source = "filesystem",
+        position = "current",
+      })
+    end,
+    close = function(ctx, winid)
+      pcall(function()
+        require("neo-tree.command").execute({ action = "close" })
+      end)
+    end,
+  },
+}
+
 --- The state of the tree.
 M.state = {
   dir = nil,
