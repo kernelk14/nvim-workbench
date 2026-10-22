@@ -59,8 +59,9 @@ M.defaults = {
   -- Automatically open the workbench on startup.
   auto_open = false,
 
-  -- Panel providers that can be cycled through in the bottom pane.
-  panels = { "problems", "quickfix", "output", "terminal" },
+  -- The panel providers that can be shown in the panel, in the order of
+  -- their tabs.
+  panels = { "problems", "output", "terminal", "quickfix" },
 
   -- The provider used for the bottom pane when the workbench opens.
   panel = "problems",

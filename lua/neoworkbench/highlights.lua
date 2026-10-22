@@ -20,6 +20,9 @@ M.groups = {
   NeoworkbenchInfo = { fg = "cyan", bg = "bg" },
   NeoworkbenchHint = { fg = "accent3", bg = "bg" },
   NeoworkbenchOk = { fg = "green", bg = "bg" },
+  NeoworkbenchPanelActive = { fg = "accent2", bg = "surface_alt", bold = true },
+  NeoworkbenchPanelInactive = { fg = "muted", bg = "bg" },
+  NeoworkbenchPanelBorder = { fg = "border", bg = "bg" },
 }
 
 --- Register the groups with neocore and apply them.

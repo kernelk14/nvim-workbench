@@ -12,6 +12,7 @@ local focus = require("neoworkbench.focus")
 local apply = require("neoworkbench.apply")
 local pane = require("neoworkbench.pane")
 local providers = require("neoworkbench.providers")
+local panel = require("neoworkbench.providers.panel")
 local session = require("neoworkbench.session")
 local highlights = require("neoworkbench.highlights")
 
@@ -329,6 +330,11 @@ function M.open(layout_name)
         neowin.plain(winid)
       end
 
+      -- The panel has a tab bar instead of a title.
+      if pane_name == "panel" then
+        panel.set_tab_bar(winid, M.panel)
+      end
+
       pane.set(pane_name, winid, bufnr, variant)
     end
   end
@@ -539,13 +545,8 @@ function M.set_panel(name)
   end
   pane.set("panel", winid, bufnr, variant)
 
-  if config.get().title then
-    local title, icon = pane_title("panel")
-    neowin.set_title(winid, {
-      { text = " " .. (icon and (icon .. " ") or ""), hl = "NeoworkbenchAccent2" },
-      { text = title, hl = "NeoworkbenchTitle" },
-    })
-  end
+  -- The tab bar of the panel, every provider is a tab.
+  panel.set_tab_bar(winid, M.panel)
 
   return true
 end
