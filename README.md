@@ -114,7 +114,7 @@ Three layouts ship with the plugin:
 | Pane       | What it shows                                            |
 | ---------- | -------------------------------------------------------- |
 | `editor`   | the buffer that was being edited                          |
-| `explorer` | a dependency free file tree                               |
+| `explorer` | a file tree in the style of VS Code                               |
 | `panel`    | the bottom pane, it shows one of the panel providers     |
 | `problems` | the diagnostics of the workspace                          |
 | `quickfix` | the entries of the quickfix list                          |
