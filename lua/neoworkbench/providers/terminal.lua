@@ -34,7 +34,12 @@ local function start(winid)
   vim.api.nvim_set_current_win(winid)
   vim.api.nvim_win_set_buf(winid, bufnr)
 
-  local ok = pcall(vim.fn.jobstart, cmd, { term = true })
+  -- termopen works on every version of Neovim, the terminal option of
+  -- jobstart is newer and does nothing before Neovim 0.11.
+  local ok = pcall(vim.fn.termopen, cmd)
+  if not ok then
+    ok = pcall(vim.fn.jobstart, cmd, { term = true })
+  end
   if not ok then
     return false
   end
