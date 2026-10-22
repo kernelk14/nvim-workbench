@@ -198,11 +198,14 @@ local function entries(dir)
   local dirs, files = {}, {}
   for _, name in ipairs(list) do
     if name ~= "." and name ~= ".." then
-      local path = dir .. "/" .. name
-      if vim.fn.isdirectory(path) == 1 then
-        dirs[#dirs + 1] = name
-      else
-        files[#files + 1] = name
+      -- Hidden files are shown only when the user asks for them.
+      if M.state.hidden or name:sub(1, 1) ~= "." then
+        local path = dir .. "/" .. name
+        if vim.fn.isdirectory(path) == 1 then
+          dirs[#dirs + 1] = name
+        else
+          files[#files + 1] = name
+        end
       end
     end
   end
