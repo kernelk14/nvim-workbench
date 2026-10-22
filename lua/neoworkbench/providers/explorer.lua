@@ -225,21 +225,31 @@ end
 ---@return table
 local function git_status(root)
   local status = {}
-  local handle = io.popen("git -C " .. vim.fn.shellescape(root) .. " status --porcelain=v1 -uall 2>/dev/null")
+  local cmd = "git -C " .. vim.fn.shellescape(root) .. " status --porcelain=v1 -uall"
+  if vim.fn.has("win32") == 1 then
+    cmd = cmd .. " 2>nul"
+  else
+    cmd = cmd .. " 2>/dev/null"
+  end
+  local handle = io.popen(cmd)
   if not handle then
     return status
   end
-  for line in handle:lines() do
+  local output = handle:read("*a")
+  handle:close()
+  for line in output:gmatch("[^\r\n]+") do
     local code = line:sub(1, 2)
     local path = line:sub(4)
     -- A rename shows the old and the new path.
     if code:match("R") then
       path = path:match(" -> (.+)$") or path
     end
-    -- The path is relative to the root.
-    status[root .. "/" .. path] = code:match("^%s*(%S)") or code:sub(1, 1)
+    -- The path is relative to the root, normalise the separators so the
+    -- lookup works on every platform.
+    path = path:gsub("\\", "/")
+    local full = root:gsub("\\", "/") .. "/" .. path
+    status[full] = code:match("^%s*(%S)") or code:sub(1, 1)
   end
-  handle:close()
   return status
 end
 
@@ -247,13 +257,14 @@ end
 ---@param path string
 ---@return string? letter
 local function git_letter(path)
-  local letter = M.state.git[path]
+  local normalised = path:gsub("\\", "/")
+  local letter = M.state.git[normalised]
   if letter then
     return M.git_status[letter] or letter
   end
   -- A directory may carry the status of one of its files.
   for tracked, letter in pairs(M.state.git) do
-    if tracked:sub(1, #path + 1) == path .. "/" then
+    if tracked:sub(1, #normalised + 1) == normalised .. "/" then
       return M.git_status[letter] or letter
     end
   end
