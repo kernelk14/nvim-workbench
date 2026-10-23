@@ -28,11 +28,17 @@ local function start(winid)
 
   local cmd = { vim.o.shell }
   if M.command and M.command ~= "" then
-    cmd = { vim.o.shell, "-c", M.command }
+    -- The shell flag differs between platforms.
+    local flag = vim.o.shellcmdflag or "-c"
+    cmd = { vim.o.shell, flag, M.command }
   end
 
   vim.api.nvim_set_current_win(winid)
   vim.api.nvim_win_set_buf(winid, bufnr)
+
+  -- nvim_open_term creates a terminal in the buffer on every version of
+  -- Neovim. jobstart with term then runs the command in it.
+  pcall(vim.api.nvim_open_term, bufnr, {})
 
   -- jobstart with term creates a terminal in the buffer. termopen is the old
   -- way and expects a dictionary in newer versions of Neovim.
@@ -43,6 +49,11 @@ local function start(winid)
   end
   if not ok then
     return false
+  end
+
+  -- On some versions of Neovim, jobstart does not set the buftype.
+  if vim.bo[bufnr].buftype ~= "terminal" then
+    pcall(vim.api.nvim_open_term, bufnr, {})
   end
 
   vim.bo[bufnr].filetype = "terminal"
