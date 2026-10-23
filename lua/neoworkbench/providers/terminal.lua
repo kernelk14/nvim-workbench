@@ -12,8 +12,8 @@ M.icon = "󰞊"
 M.command = nil
 
 --- Start a terminal in the window of the pane.
---- A terminal always takes over the window that is current, so the window of
---- the pane has to be focused and hold the buffer first.
+--- A terminal takes over the window that is current, so the window of the
+--- pane has to be focused and hold the buffer first.
 ---@param winid integer
 ---@return boolean ok
 local function start(winid)
@@ -34,11 +34,12 @@ local function start(winid)
   vim.api.nvim_set_current_win(winid)
   vim.api.nvim_win_set_buf(winid, bufnr)
 
-  -- termopen works on every version of Neovim, the terminal option of
-  -- jobstart is newer and does nothing before Neovim 0.11.
-  local ok = pcall(vim.fn.termopen, cmd)
+  -- jobstart with term creates a terminal in the buffer. termopen is the old
+  -- way and expects a dictionary in newer versions of Neovim.
+  local ok = pcall(vim.fn.jobstart, cmd, { term = true, buf = bufnr })
   if not ok then
-    ok = pcall(vim.fn.jobstart, cmd, { term = true })
+    -- Fall back to termopen for older versions.
+    ok = pcall(vim.fn.termopen, bufnr, cmd)
   end
   if not ok then
     return false

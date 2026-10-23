@@ -689,7 +689,10 @@ function M.flutter_run()
         vim.bo[new_buf].filetype = "neoworkbench-terminal"
         vim.api.nvim_win_set_buf(winid, new_buf)
         vim.api.nvim_set_current_win(winid)
-        vim.fn.termopen(new_buf, { vim.o.shell, "-c", item.command })
+        local ok = pcall(vim.fn.jobstart, { vim.o.shell, "-c", item.command }, { term = true, buf = new_buf })
+        if not ok then
+          pcall(vim.fn.termopen, new_buf, { vim.o.shell, "-c", item.command })
+        end
         vim.bo[new_buf].filetype = "terminal"
       end
     end,
