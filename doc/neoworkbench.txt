@@ -12,6 +12,7 @@ CONTENTS                                               *neoworkbench-contents*
   3. Installation ....................... |neoworkbench-installation|
   4. Layout ............................. |neoworkbench-layout|
   5. Panes .............................. |neoworkbench-panes|
+  6. Popups ............................. |neoworkbench-popups|
   6. Third party plugins ................ |neoworkbench-third-party|
   7. Commands ........................... |neoworkbench-commands|
   8. Keymaps ............................ |neoworkbench-keymaps|
