@@ -23,6 +23,14 @@ M.groups = {
   NeoworkbenchPanelActive = { fg = "accent2", bg = "surface_alt", bold = true },
   NeoworkbenchPanelInactive = { fg = "muted", bg = "bg" },
   NeoworkbenchPanelBorder = { fg = "border", bg = "bg" },
+  NeoworkbenchPopupNormal = { fg = "text", bg = "surface" },
+  NeoworkbenchPopupBorder = { fg = "border", bg = "surface" },
+  NeoworkbenchPopupTitle = { fg = "accent2", bg = "surface", bold = true },
+  NeoworkbenchPopupIcon = { fg = "accent2", bg = "surface" },
+  NeoworkbenchPopupText = { fg = "text", bg = "surface" },
+  NeoworkbenchPopupKey = { fg = "text", bg = "surface_alt", bold = true },
+  NeoworkbenchPopupSelected = { fg = "bg", bg = "accent", bold = true },
+  NeoworkbenchPopupMuted = { fg = "muted", bg = "surface" },
 }
 
 --- Register the groups with neocore and apply them.

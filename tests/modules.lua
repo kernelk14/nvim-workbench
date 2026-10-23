@@ -36,6 +36,7 @@ local modules = {
   "neoworkbench.providers.output",
   "neoworkbench.providers.terminal",
   "neoworkbench.providers.outline",
+  "neoworkbench.popup",
 }
 
 for _, name in ipairs(modules) do

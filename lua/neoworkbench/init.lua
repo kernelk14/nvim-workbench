@@ -13,6 +13,7 @@ local apply = require("neoworkbench.apply")
 local pane = require("neoworkbench.pane")
 local providers = require("neoworkbench.providers")
 local panel = require("neoworkbench.providers.panel")
+local popup = require("neoworkbench.popup")
 local session = require("neoworkbench.session")
 local highlights = require("neoworkbench.highlights")
 
@@ -442,6 +443,24 @@ function M.is_open()
   return pane.is_open()
 end
 
+--- Open a popup modal with a list of choices.
+---@param opts table? `title`, `items`, `on_select`, `on_close`
+---@return boolean ok
+function M.popup(opts)
+  return popup.open(opts)
+end
+
+--- Whether the popup is open.
+---@return boolean
+function M.popup_open()
+  return popup.is_open()
+end
+
+--- Close the popup.
+function M.popup_close()
+  popup.close()
+end
+
 --- Switch to another layout, rebuilding the workbench.
 ---@param name string
 ---@return boolean ok
@@ -622,6 +641,85 @@ function M.relayout()
   apply.resize(tree)
 end
 
+--- The Flutter run platform menu.
+---
+--- A popup that lets the user pick the platform to run a Flutter app on. The
+--- platforms are the ones Flutter supports, the entry that is picked runs the
+--- command that matches.
+function M.flutter_run()
+  local platforms = {
+    { icon = "󰀲", label = "Android", key = "a", command = "flutter run -d android" },
+    { icon = "󰀲", label = "iOS", key = "i", command = "flutter run -d ios" },
+    { icon = "󰖟", label = "Web (Chrome)", key = "w", command = "flutter run -d chrome" },
+    { icon = "󰍲", label = "Windows", key = "W", command = "flutter run -d windows" },
+    { icon = "󰀲", label = "macOS", key = "m", command = "flutter run -d macos" },
+    { icon = "󰀲", label = "Linux", key = "l", command = "flutter run -d linux" },
+  }
+
+  M.popup({
+    title = "Run on",
+    items = platforms,
+    on_select = function(item)
+      local output = require("neoworkbench.providers.output")
+      output.log("Running: " .. item.command)
+      -- Open the terminal panel and run the command.
+      M.set_panel("terminal")
+      local terminal = require("neoworkbench.providers.terminal")
+      terminal.command = item.command
+      -- Re-open the terminal with the new command.
+      local winid = pane.win("panel")
+      if winid then
+        local bufnr = vim.api.nvim_win_get_buf(winid)
+        if vim.bo[bufnr].buftype == "terminal" then
+          -- Stop the old terminal.
+          pcall(vim.fn.jobstop, vim.b[bufnr].terminal_job_id)
+        end
+        local new_buf = vim.api.nvim_create_buf(false, true)
+        vim.bo[new_buf].buftype = "nofile"
+        vim.bo[new_buf].bufhidden = "hide"
+        vim.bo[new_buf].swapfile = false
+        vim.bo[new_buf].filetype = "neoworkbench-terminal"
+        vim.api.nvim_win_set_buf(winid, new_buf)
+        vim.api.nvim_set_current_win(winid)
+        vim.fn.termopen(new_buf, { vim.o.shell, "-c", item.command })
+        vim.bo[new_buf].filetype = "terminal"
+      end
+    end,
+  })
+end
+
+--- The Flutter hot reload menu.
+---
+--- A popup that lets the user pick a hot reload action.
+function M.flutter_reload()
+  local actions = {
+    { icon = "󰑓", label = "Hot reload", key = "r", command = "r" },
+    { icon = "󰑓", label = "Hot restart", key = "R", command = "R" },
+    { icon = "󰅖", label = "Quit", key = "q", command = "q" },
+  }
+
+  M.popup({
+    title = "Flutter",
+    items = actions,
+    on_select = function(item)
+      local term = require("neoworkbench.providers.terminal")
+      if term.command then
+        -- Send the key to the terminal.
+        local winid = pane.win("panel")
+        if winid then
+          local bufnr = vim.api.nvim_win_get_buf(winid)
+          if vim.bo[bufnr].buftype == "terminal" then
+            local chan = vim.b[bufnr].terminal_job_id
+            if chan then
+              vim.api.nvim_chan_send(chan, item.command)
+            end
+          end
+        end
+      end
+    end,
+  })
+end
+
 --- Create the user commands.
 function M.create_commands()
   vim.api.nvim_create_user_command("Workbench", function()
@@ -703,6 +801,103 @@ function M.create_commands()
       buffers = pane.state.buffers or {},
     })
   end, { desc = "Save the workbench session" })
+
+  vim.api.nvim_create_user_command("WorkbenchPopup", function(args)
+    if args.args ~= "" then
+      -- Run a named popup.
+      if args.args == "flutter" then
+        M.flutter_run()
+      elseif args.args == "layout" then
+        local names = config.layout_names()
+        local items = {}
+        for _, name in ipairs(names) do
+          items[#items + 1] = { label = name, key = tostring(#items + 1), action = name }
+        end
+        M.popup({
+          title = "Layout",
+          items = items,
+          on_select = function(item)
+            M.set_layout(item.action)
+          end,
+        })
+      elseif args.args == "panel" then
+        local items = {}
+        for _, name in ipairs(config.get().panels or {}) do
+          local provider = providers.get(name)
+          items[#items + 1] = {
+            icon = provider and provider.icon or "",
+            label = provider and provider.title or name,
+            key = tostring(#items + 1),
+            action = name,
+          }
+        end
+        M.popup({
+          title = "Panel",
+          items = items,
+          on_select = function(item)
+            M.set_panel(item.action)
+          end,
+        })
+      end
+    else
+      -- Show the available popups.
+      local items = {
+        { icon = "󰘳", label = "Layout", key = "l", action = "layout" },
+        { icon = "󰅂", label = "Panel", key = "p", action = "panel" },
+        { icon = "󰘳", label = "Flutter run", key = "f", action = "flutter" },
+      }
+      M.popup({
+        title = "Popups",
+        items = items,
+        on_select = function(item)
+          vim.schedule(function()
+            if item.action == "layout" then
+              M.popup({
+                title = "Layout",
+                items = (function()
+                  local names = config.layout_names()
+                  local its = {}
+                  for _, name in ipairs(names) do
+                    its[#its + 1] = { label = name, key = tostring(#its + 1), action = name }
+                  end
+                  return its
+                end)(),
+                on_select = function(it)
+                  M.set_layout(it.action)
+                end,
+              })
+            elseif item.action == "panel" then
+              local its = {}
+              for _, name in ipairs(config.get().panels or {}) do
+                local provider = providers.get(name)
+                its[#its + 1] = {
+                  icon = provider and provider.icon or "",
+                  label = provider and provider.title or name,
+                  key = tostring(#its + 1),
+                  action = name,
+                }
+              end
+              M.popup({
+                title = "Panel",
+                items = its,
+                on_select = function(it)
+                  M.set_panel(it.action)
+                end,
+              })
+            elseif item.action == "flutter" then
+              M.flutter_run()
+            end
+          end)
+        end,
+      })
+    end
+  end, {
+    desc = "Open a popup modal",
+    nargs = "?",
+    complete = function()
+      return { "flutter", "layout", "panel" }
+    end,
+  })
 end
 
 --- Create the keymaps.
@@ -768,6 +963,57 @@ function M.create_keymaps()
   map(keys.close, function()
     M.close()
   end, "Close the workbench")
+  map("<leader>Wm", function()
+    M.popup({
+      title = "Popups",
+      items = {
+        { icon = "󰘳", label = "Layout", key = "l", action = "layout" },
+        { icon = "󰅂", label = "Panel", key = "p", action = "panel" },
+        { icon = "󰘳", label = "Flutter run", key = "f", action = "flutter" },
+        { icon = "󰑓", label = "Flutter reload", key = "r", action = "reload" },
+      },
+      on_select = function(item)
+        vim.schedule(function()
+          if item.action == "layout" then
+            local names = config.layout_names()
+            local its = {}
+            for _, name in ipairs(names) do
+              its[#its + 1] = { label = name, key = tostring(#its + 1), action = name }
+            end
+            M.popup({
+              title = "Layout",
+              items = its,
+              on_select = function(it)
+                M.set_layout(it.action)
+              end,
+            })
+          elseif item.action == "panel" then
+            local its = {}
+            for _, name in ipairs(config.get().panels or {}) do
+              local provider = providers.get(name)
+              its[#its + 1] = {
+                icon = provider and provider.icon or "",
+                label = provider and provider.title or name,
+                key = tostring(#its + 1),
+                action = name,
+              }
+            end
+            M.popup({
+              title = "Panel",
+              items = its,
+              on_select = function(it)
+                M.set_panel(it.action)
+              end,
+            })
+          elseif item.action == "flutter" then
+            M.flutter_run()
+          elseif item.action == "reload" then
+            M.flutter_reload()
+          end
+        end)
+      end,
+    })
+  end, "Open a popup menu")
 end
 
 --- Create the autocommands.
