@@ -645,8 +645,16 @@ end
 ---
 --- A popup that lets the user pick the platform to run a Flutter app on. The
 --- platforms are the ones Flutter supports, the entry that is picked runs the
---- command that matches.
+--- command that matches. The workbench is opened first when it is closed.
 function M.flutter_run()
+  -- The workbench has to be open, the terminal panel lives in it.
+  if not pane.is_open() then
+    M.open()
+  end
+  if not pane.is_open() then
+    return
+  end
+
   local platforms = {
     { icon = "󰀲", label = "Android", key = "a", command = "flutter run -d android" },
     { icon = "󰀲", label = "iOS", key = "i", command = "flutter run -d ios" },
