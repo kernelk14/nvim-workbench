@@ -132,7 +132,7 @@ function M.setup(opts)
   -- The editor may already be up when the plugin is loaded, a lazy plugin
   -- manager loads it when the VimEnter event fires. The autocommand below
   -- handles the other case, where the plugin is loaded before VimEnter.
-  if options.auto_open then
+  if options.auto_open and vim.fn.argc() > 0 and not (vim.fn.argc() == 1 and vim.fn.argv(0) == ".") then
     vim.schedule(M.auto_open)
   end
 
